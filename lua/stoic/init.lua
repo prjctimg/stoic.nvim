@@ -24,19 +24,36 @@ local default_config = {
 
 -- === GLOBAL STATE ===
 local config = {}
-local win = nil
-local buf = nil
-local current_entry = nil
+local setup_complete = false
 
--- Data state (from data.lua)
-local stoic_data = {}
-local data_by_date = {}
-local data_loaded = false
+-- Module imports (lazy loading)
+local data, navigation, window, bookmarks, format
 
--- Bookmarks state (from bookmarks.lua)
-local bookmarks = {}
-local bookmarks_loaded = false
-local bookmarks_file = ""
+-- Lazy load modules
+local function get_data()
+  if not data then data = require("stoic.data") end
+  return data
+end
+
+local function get_navigation()
+  if not navigation then navigation = require("stoic.navigation") end
+  return navigation
+end
+
+local function get_window()
+  if not window then window = require("stoic.window") end
+  return window
+end
+
+local function get_bookmarks()
+  if not bookmarks then bookmarks = require("stoic.bookmarks") end
+  return bookmarks
+end
+
+local function get_format()
+  if not format then format = require("stoic.format") end
+  return format
+end
 
 -- === ERROR HANDLING ===
 function M._handle_error(operation, error_msg)
@@ -65,720 +82,13 @@ function M._validate_config(user_config)
   return true
 end
 
--- === DATA MANAGEMENT FUNCTIONS (from data.lua) ===
-local function parse_date(date_str)
-  if not date_str then return nil end
-
-  local month, day = date_str:match("(%a+)%s+(%d+)")
-  if not month or not day then return nil end
-
-  return { month = month, day = tonumber(day) }
-end
-
-local function create_date_index(date_str)
-  if not date_str then return 0 end
-
-  local month_order = {
-    January = 1, February = 2, March = 3, April = 4, May = 5, June = 6,
-    July = 7, August = 8, September = 9, October = 10, November = 11, December = 12
-  }
-
-  local date_parts = parse_date(date_str)
-  if not date_parts then return 0 end
-
-  local month_num = month_order[date_parts.month]
-  if not month_num then return 0 end
-
-  return (month_num * 100) + date_parts.day
-end
-
-local function load_data()
-  if data_loaded then return true end
-
-  local data_file = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h:h:h") .. "/stoic.json"
-
-  if not vim.fn.filereadable(data_file) then
-    M._handle_error("data loading", "Data file not found at " .. data_file)
-    return false
-  end
-
-  local content = vim.fn.readfile(data_file)
-  if not content or #content == 0 then
-    M._handle_error("data loading", "Empty data file")
-    return false
-  end
-
-  local success, parsed_data = pcall(vim.json.decode, table.concat(content, "\n"))
-  if not success then
-    M._handle_error("data loading", "Failed to parse data file - " .. parsed_data)
-    return false
-  end
-
-  stoic_data = parsed_data
-
-  -- Create date-based index for easy lookup
-  data_by_date = {}
-  for i, entry in ipairs(stoic_data) do
-    local date_idx = create_date_index(entry.date)
-    entry._date_idx = date_idx
-    entry._index = i
-    if entry.date then
-      data_by_date[entry.date] = entry
-    end
-  end
-
-  -- Sort data by date index for chronological navigation
-  table.sort(stoic_data, function(a, b)
-    return a._date_idx < b._date_idx
-  end)
-
-  data_loaded = true
-  M._handle_info("Loaded " .. #stoic_data .. " entries")
-  return true
-end
-
-local function get_all_data()
-  if not data_loaded then
-    load_data()
-  end
-  return stoic_data
-end
-
-local function get_data_by_date(date_str)
-  if not data_loaded then
-    load_data()
-  end
-  return data_by_date[date_str]
-end
-
-local function get_data_by_index(idx)
-  if not data_loaded then
-    load_data()
-  end
-  local entry = stoic_data[idx]
-  if entry then
-    entry._index = idx  -- Ensure the entry has its index set
-  end
-  return entry
-end
-
-local function get_data_by_docId(docId)
-  if not data_loaded then
-    load_data()
-  end
-
-  for i, entry in ipairs(stoic_data) do
-    if entry.docId == docId then
-      entry._index = i
-      return entry
-    end
-  end
-  return nil
-end
-
-local function get_next_data(current_idx)
-  if not data_loaded then
-    load_data()
-  end
-  if not current_idx then return get_data_by_index(1) end
-
-  local next_idx = (current_idx % #stoic_data) + 1
-  return get_data_by_index(next_idx)
-end
-
-local function get_prev_data(current_idx)
-  if not data_loaded then
-    load_data()
-  end
-  if not current_idx then return get_data_by_index(#stoic_data) end
-
-  local prev_idx = current_idx - 1
-  if prev_idx < 1 then prev_idx = #stoic_data end
-  return get_data_by_index(prev_idx)
-end
-
--- === BOOKMARK MANAGEMENT FUNCTIONS (from bookmarks.lua) ===
-local function get_bookmarks_file()
-  if bookmarks_file == "" then
-    local config_dir = vim.fn.stdpath("data") .. "/stoic"
-    if vim.fn.isdirectory(config_dir) == 0 then
-      vim.fn.mkdir(config_dir, "p")
-    end
-    bookmarks_file = config_dir .. "/bookmarks.json"
-  end
-  return bookmarks_file
-end
-
-local function load_bookmarks()
-  if bookmarks_loaded then return true end
-
-  local file = get_bookmarks_file()
-
-  if vim.fn.filereadable(file) == 1 then
-    local content = vim.fn.readfile(file)
-    if content and #content > 0 then
-      local success, data = pcall(vim.json.decode, table.concat(content, "\n"))
-      if success then
-        bookmarks = data or {}
-        bookmarks_loaded = true
-        M._handle_info("Loaded " .. vim.tbl_count(bookmarks) .. " bookmarks")
-        return true
-      else
-        M._handle_error("bookmarks loading", "Failed to parse bookmarks file")
-      end
-    end
-  end
-
-  bookmarks = {}
-  bookmarks_loaded = true
-  return true
-end
-
-local function save_bookmarks()
-  if not bookmarks_loaded then return false end
-
-  local file = get_bookmarks_file()
-  local content = vim.json.encode(bookmarks)
-
-  local success = pcall(vim.fn.writefile, vim.split(content, "\n"), file)
-  if not success then
-    M._handle_error("bookmarks saving", "Failed to save bookmarks")
-    return false
-  end
-
-  return true
-end
-
-local function add_bookmark(entry)
-  if not entry or not entry.docId then
-    M._handle_error("bookmark operation", "Cannot bookmark entry without docId")
-    return false
-  end
-
-  if bookmarks_loaded == false then
-    load_bookmarks()
-  end
-
-  -- Check if already bookmarked
-  if bookmarks[entry.docId] then
-    vim.notify("Stoic: Entry already bookmarked", vim.log.levels.WARN)
-    return false
-  end
-
-  -- Create bookmark entry
-  local bookmark = {
-    docId = entry.docId,
-    title = entry.title,
-    author = entry.author,
-    date = entry.date,
-    book = entry.book,
-    added_at = os.date("%Y-%m-%d %H:%M:%S")
-  }
-
-  bookmarks[entry.docId] = bookmark
-
-  if save_bookmarks() then
-    M._handle_info("Bookmark added")
-    return true
-  end
-
-  return false
-end
-
-local function remove_bookmark(docId)
-  if not docId then
-    M._handle_error("bookmark operation", "Cannot remove bookmark without docId")
-    return false
-  end
-
-  if bookmarks_loaded == false then
-    load_bookmarks()
-  end
-
-  if not bookmarks[docId] then
-    vim.notify("Stoic: Bookmark not found", vim.log.levels.WARN)
-    return false
-  end
-
-  bookmarks[docId] = nil
-
-  if save_bookmarks() then
-    M._handle_info("Bookmark removed")
-    return true
-  end
-
-  return false
-end
-
-local function is_bookmarked(docId)
-  if not docId then return false end
-
-  if bookmarks_loaded == false then
-    load_bookmarks()
-  end
-
-  return bookmarks[docId] ~= nil
-end
-
-local function get_all_bookmarks()
-  if bookmarks_loaded == false then
-    load_bookmarks()
-  end
-
-  local bookmark_list = {}
-  for _, bookmark in pairs(bookmarks) do
-    table.insert(bookmark_list, bookmark)
-  end
-
-  -- Sort by date (chronological order)
-  table.sort(bookmark_list, function(a, b)
-    local date_a = create_date_index(a.date)
-    local date_b = create_date_index(b.date)
-    return date_a < date_b
-  end)
-
-  return bookmark_list
-end
-
--- === NAVIGATION FUNCTIONS (from navigation.lua) ===
-local function get_today_date()
-  local date_table = os.date("*t")
-  local months = {
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  }
-
-  local month_name = months[date_table.month]
-  local day = date_table.day
-
-  -- Handle ordinal suffixes
-  local suffix = "th"
-  if day == 1 or day == 21 or day == 31 then
-    suffix = "st"
-  elseif day == 2 or day == 22 then
-    suffix = "nd"
-  elseif day == 3 or day == 23 then
-    suffix = "rd"
-  end
-
-  return month_name .. " " .. day .. suffix
-end
-
-local function get_today_entry()
-  local today_date = get_today_date()
-  local entry = get_data_by_date(today_date)
-
-  -- If no entry for today, get the first entry
-  if not entry then
-    local all_data = get_all_data()
-    entry = all_data[1]
-  end
-
-  return entry
-end
-
-local function get_date_entry(date_str)
-  -- Try to find exact match
-  local entry = get_data_by_date(date_str)
-  if entry then return entry end
-
-  -- Try to parse flexible date formats
-  local month, day = date_str:match("(%a+)%s+(%d+)")
-  if month and day then
-    local months = {
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    }
-
-    -- Normalize month name
-    for _, month_name in ipairs(months) do
-      if month_name:lower():sub(1, 3) == month:lower():sub(1, 3) then
-        month = month_name
-        break
-      end
-    end
-
-    local day_num = tonumber(day)
-    if day_num then
-      -- Handle ordinal suffixes
-      local suffix = "th"
-      if day_num == 1 or day_num == 21 or day_num == 31 then
-        suffix = "st"
-      elseif day_num == 2 or day_num == 22 then
-        suffix = "nd"
-      elseif day_num == 3 or day_num == 23 then
-        suffix = "rd"
-      end
-
-      local formatted_date = month .. " " .. day_num .. suffix
-      entry = get_data_by_date(formatted_date)
-      if entry then return entry end
-    end
-  end
-
-  return nil
-end
-
--- === FORMATTING FUNCTIONS (from format.lua) ===
-local function wrap_text(text, width)
-  if not text then return {} end
-
-  local lines = {}
-
-  -- Split text into paragraphs by literal line breaks
-  local paragraphs = {}
-  for paragraph in text:gmatch("([^\n]+)") do
-    table.insert(paragraphs, paragraph)
-  end
-
-  for i, paragraph in ipairs(paragraphs) do
-    -- Use vim.split to properly handle word boundaries
-    local words = vim.split(paragraph, "%s+", { trimempty = true })
-    local current_line = ""
-
-    for _, word in ipairs(words) do
-      if #current_line == 0 then
-        current_line = word
-      elseif #current_line + 1 + #word <= width then
-        current_line = current_line .. " " .. word
-      else
-        table.insert(lines, current_line)
-        current_line = word
-      end
-    end
-
-    -- Add last line if there's content
-    if #current_line > 0 then
-      table.insert(lines, current_line)
-    end
-
-    -- Add blank line between paragraphs (except for the last one)
-    if i < #paragraphs then
-      table.insert(lines, "")
-    end
-  end
-
-  return lines
-end
-
-local function format_entry(entry, entry_config)
-  if not entry then return {}, {} end
-
-  local content = {}
-  local highlights = {}
-  local line_num = 0
-
-  -- Window width for text wrapping
-  local window_width = (entry_config.window and entry_config.window.width) or 80
-  local text_width = window_width - 4 -- Account for padding
-
-  -- Add date at the top with emoji
-  if entry.date then
-    table.insert(content, "")
-    local date_line = "📅 " .. entry.date
-    table.insert(content, date_line)
-    table.insert(highlights, {
-      group = entry_config.highlights.author,
-      line = line_num + 2,
-      col_start = 0,
-      col_end = #date_line
-    })
-    table.insert(content, "")
-    line_num = line_num + 3
-  end
-
-  -- Add title with emoji
-  if entry.title then
-    table.insert(content, "")
-    local title_line = "🎯 " .. entry.title
-    table.insert(content, title_line)
-    table.insert(highlights, {
-      group = entry_config.highlights.title,
-      line = line_num + 2,
-      col_start = 0,
-      col_end = #title_line
-    })
-    table.insert(content, "")
-    line_num = line_num + 3
-  end
-
-  -- Add quote with emoji
-  if entry.quote then
-    table.insert(content, "")
-    local quote_header = "💭 Quote:"
-    table.insert(content, quote_header)
-    table.insert(highlights, {
-      group = entry_config.highlights.title,
-      line = line_num + 2,
-      col_start = 0,
-      col_end = #quote_header
-    })
-    line_num = line_num + 1
-
-    local quote_lines = wrap_text(entry.quote, text_width)
-    for i, line in ipairs(quote_lines) do
-      table.insert(content, "  " .. line)
-      table.insert(highlights, {
-        group = entry_config.highlights.quote,
-        line = line_num + i,
-        col_start = 0,
-        col_end = #line + 2
-      })
-    end
-    table.insert(content, "")
-    line_num = line_num + #quote_lines + 2
-  end
-
-  -- Add author and book with emoji
-  if entry.author or entry.book then
-    local author_book = "📚 "
-    if entry.author then
-      author_book = author_book .. entry.author
-    end
-    if entry.book then
-      author_book = author_book .. " - " .. entry.book
-    end
-    table.insert(content, author_book)
-    table.insert(highlights, {
-      group = entry_config.highlights.author,
-      line = line_num + 1,
-      col_start = 0,
-      col_end = #author_book
-    })
-    table.insert(content, "")
-    line_num = line_num + 2
-  end
-
-  -- Add commentary section with emoji
-  if entry.commentary and entry.commentary ~= "" then
-    table.insert(content, "")
-    local commentary_header = "💡 Commentary:"
-    table.insert(content, commentary_header)
-    table.insert(highlights, {
-      group = entry_config.highlights.title,
-      line = line_num + 2,
-      col_start = 0,
-      col_end = #commentary_header
-    })
-    line_num = line_num + 1
-
-    -- Use simpler wrapping for commentary to avoid formatting issues
-    local commentary_text = entry.commentary:gsub("\n", " ")
-    local commentary_lines = wrap_text(commentary_text, text_width)
-    for i, line in ipairs(commentary_lines) do
-      table.insert(content, "  " .. line)
-      table.insert(highlights, {
-        group = entry_config.highlights.commentary,
-        line = line_num + i,
-        col_start = 0,
-        col_end = #line + 2
-      })
-    end
-    table.insert(content, "")
-    line_num = line_num + #commentary_lines + 2
-end
-
-  -- Add bookmark indicator only
-  local is_entry_bookmarked = is_bookmarked(entry.docId)
-  local bookmark_indicator = is_entry_bookmarked and "🔖 Bookmarked" or ""
-
-  if bookmark_indicator ~= "" then
-    table.insert(content, bookmark_indicator)
-    table.insert(content, "")
-  end
-
-  return content, highlights
-end
-
--- === WINDOW MANAGEMENT FUNCTIONS (from window.lua) ===
-local function generate_footer_text(keymaps_config)
-  local keymaps = keymaps_config or {}
-  return string.format("[%s] next | [%s] prev | [%s] bookmark | [B] bookmarks | [%s] quit",
-    keymaps.next or 'n',
-    keymaps.prev or 'p',
-    keymaps.bookmark or 'b',
-    keymaps.quit or 'q'
-  )
-end
-
-local function create_window(entry_config)
-  local user_config = entry_config.window or {}
-
-  -- Calculate position based on user preference
-  local width = user_config.width or 80
-  local height = user_config.height or 30
-
-  -- Default to centered position, fallback to top-left if no UI available
-  local row, col = 0, 0
-  local uis = vim.api.nvim_list_uis()
-  if #uis > 0 then
-    local screen_width = uis[1].width
-    local screen_height = uis[1].height
-    if user_config.position == "center" then
-      row = math.floor((screen_height - height) / 2)
-      col = math.floor((screen_width - width) / 2)
-    end
-  end
-
-  -- Create valid window config
-  local window_config = {
-    title = "Stoic Wisdom",
-    footer = generate_footer_text(entry_config.keymaps),
-    footer_pos = "center",
-    style = "minimal",
-    relative = "editor",
-    border = user_config.border or "rounded",
-    width = width,
-    height = height,
-    row = row,
-    col = col,
-  }
-
-  -- Create buffer
-  buf = vim.api.nvim_create_buf(false, true)
-
-  -- Set buffer options
-  vim.api.nvim_buf_set_option(buf, 'modifiable', false)
-  vim.api.nvim_buf_set_option(buf, 'readonly', true)
-  vim.api.nvim_buf_set_option(buf, 'buftype', 'nofile')
-  vim.api.nvim_buf_set_option(buf, 'filetype', 'markdown')
-  vim.api.nvim_buf_set_option(buf, 'bufhidden', 'wipe')
-
-  -- Create window (enter = true to focus immediately)
-  local win_id = vim.api.nvim_open_win(buf, true, window_config)
-
-  -- Set window options
-  vim.api.nvim_win_set_option(win_id, 'wrap', true)
-  vim.api.nvim_win_set_option(win_id, 'linebreak', true)
-  vim.api.nvim_win_set_option(win_id, 'number', false)
-  vim.api.nvim_win_set_option(win_id, 'relativenumber', false)
-  vim.api.nvim_win_set_option(win_id, 'cursorline', false)
-
-  return { buf = buf, win = win_id }
-end
-
-local function close_window()
-  if win then
-    if win.win and vim.api.nvim_win_is_valid(win.win) then
-      vim.api.nvim_win_close(win.win, true)
-    end
-    if win.buf and vim.api.nvim_buf_is_valid(win.buf) then
-      vim.api.nvim_buf_delete(win.buf, { force = true })
-    end
-    win = nil
-    buf = nil
-  end
-end
-
-local function setup_keymaps(entry_config)
-  if not win or not win.buf then return end
-
-  local keymaps = entry_config.keymaps or {}
-
-  local opts = { buffer = win.buf, silent = true, nowait = true, desc = "Stoic navigation" }
-
-  vim.keymap.set('n', keymaps.next or 'n', function()
-    M.show_next()
-  end, opts)
-
-  vim.keymap.set('n', keymaps.prev or 'p', function()
-    M.show_prev()
-  end, opts)
-
-  vim.keymap.set('n', keymaps.bookmark or 'b', function()
-    M.toggle_bookmark()
-  end, opts)
-
-  vim.keymap.set('n', keymaps.quit or 'q', function()
-    close_window()
-  end, opts)
-
-  -- Also add view bookmarks keymap
-  vim.keymap.set('n', 'B', function()
-    M.show_bookmarks()
-  end, { buffer = win.buf, silent = true, nowait = true, desc = "View bookmarks" })
-end
-
-local function show_entry_in_window(entry, entry_config)
-  if not entry then return end
-
-  current_entry = entry
-
-  -- Close existing window if open
-  close_window()
-
-  -- Create new window
-  win = create_window(entry_config)
-  if not win then
-    M._handle_error("window creation", "Failed to create window")
-    return
-  end
-
-  -- Format content
-  local content, highlights = format_entry(entry, entry_config)
-
-  -- Set buffer content
-  if win.buf then
-    -- Suppress W10 warning by temporarily disabling readonly notification
-    local original_eventignore = vim.o.eventignore
-    local original_shortmess = vim.o.shortmess
-    vim.o.eventignore = "BufModifiedSet"
-    vim.o.shortmess = vim.o.shortmess .. "W"  -- W to suppress "written to file" messages
-
-    -- Set buffer as modifiable before writing
-    vim.api.nvim_buf_set_option(win.buf, 'modifiable', true)
-    vim.api.nvim_buf_set_option(win.buf, 'readonly', false)
-    vim.api.nvim_buf_set_lines(win.buf, 0, -1, false, content)
-    vim.api.nvim_buf_set_option(win.buf, 'modifiable', true)
-    vim.api.nvim_buf_set_option(win.buf, 'readonly', true)
-
-    -- Restore original options
-    vim.o.eventignore = original_eventignore
-    vim.o.shortmess = original_shortmess
-
-    -- Apply highlights
-    for _, hl in ipairs(highlights) do
-      vim.api.nvim_buf_add_highlight(win.buf, 0, hl.group, hl.line, hl.col_start, hl.col_end)
-    end
-
-    -- Set up keymaps
-    setup_keymaps(entry_config)
-  end
-end
-
-local function show_next_in_window(entry_config)
-  if not current_entry then return end
-
-  local next_entry = get_next_data(current_entry._index)
-  show_entry_in_window(next_entry, entry_config)
-end
-
-local function show_prev_in_window(entry_config)
-  if not current_entry then return end
-
-  local prev_entry = get_prev_data(current_entry._index)
-  show_entry_in_window(prev_entry, entry_config)
-end
-
-local function toggle_bookmark_in_window(entry_config)
-  if not current_entry then return end
-
-  local entry_is_bookmarked = is_bookmarked(current_entry.docId)
-
-  if entry_is_bookmarked then
-    remove_bookmark(current_entry.docId)
-    M._handle_info("Bookmark removed")
-  else
-    add_bookmark(current_entry)
-    M._handle_info("Bookmark added")
-  end
-
-  -- Refresh display
-  show_entry_in_window(current_entry, entry_config)
-end
-
 -- === SETUP FUNCTION ===
 function M.setup(opts)
+  -- Prevent multiple setups
+  if setup_complete then
+    return true
+  end
+
   -- Validate configuration
   if not M._validate_config(opts) then
     return false
@@ -786,30 +96,19 @@ function M.setup(opts)
 
   config = vim.tbl_deep_extend("force", default_config, opts or {})
 
-  -- Initialize data
-  local ok = load_data()
-  if not ok then
-    return false
-  end
-
-  -- Initialize bookmarks
-  ok = load_bookmarks()
-  if not ok then
-    return false
-  end
-
   -- Create highlight groups
   vim.api.nvim_set_hl(0, config.highlights.title, { fg = "#ffffff", bold = true })
   vim.api.nvim_set_hl(0, config.highlights.author, { fg = "#8888ff" })
   vim.api.nvim_set_hl(0, config.highlights.quote, { fg = "#ffff88" })
   vim.api.nvim_set_hl(0, config.highlights.commentary, { fg = "#cccccc" })
 
+  setup_complete = true
   return true
 end
 
 -- === HELPER FUNCTION ===
 local function ensure_setup()
-  if not data_loaded then
+  if not setup_complete then
     M.setup()
   end
 end
@@ -817,15 +116,15 @@ end
 -- === PUBLIC API FUNCTIONS ===
 function M.show_today()
   ensure_setup()
-  local today_entry = get_today_entry()
-  show_entry_in_window(today_entry, config)
+  local today_entry = get_navigation().get_today_entry()
+  get_window().show_entry(today_entry, config)
 end
 
 function M.show_date(date_str)
   ensure_setup()
-  local entry = get_date_entry(date_str)
+  local entry = get_navigation().get_date_entry(date_str)
   if entry then
-    show_entry_in_window(entry, config)
+    get_window().show_entry(entry, config)
   else
     vim.notify("Stoic: No entry found for date " .. date_str, vim.log.levels.ERROR)
   end
@@ -833,48 +132,22 @@ end
 
 function M.show_next()
   ensure_setup()
-  show_next_in_window(config)
+  get_window().show_next(config)
 end
 
 function M.show_prev()
   ensure_setup()
-  show_prev_in_window(config)
+  get_window().show_prev(config)
 end
 
 function M.toggle_bookmark()
   ensure_setup()
-  toggle_bookmark_in_window(config)
+  get_window().toggle_bookmark(config)
 end
 
 function M.show_bookmarks()
   ensure_setup()
-  local bookmarked = get_all_bookmarks()
-  if #bookmarked == 0 then
-    M._handle_info("No bookmarks found")
-    return
-  end
-
-  -- Create a simple picker for bookmarks
-  local items = {}
-  for i, entry in ipairs(bookmarked) do
-    table.insert(items, string.format("%d. %s - %s", i, entry.title, entry.date))
-  end
-
-  vim.ui.select(items, {
-    prompt = "Select bookmarked entry:",
-    format_item = function(item) return item end
-  }, function(choice, idx)
-    if choice and idx then
-      -- Get the full entry using docId to ensure quote and commentary are included
-      local full_entry = get_data_by_docId(bookmarked[idx].docId)
-      if full_entry then
-        show_entry_in_window(full_entry, config)
-      else
-        -- Fallback to bookmarked entry if full entry not found
-        show_entry_in_window(bookmarked[idx], config)
-      end
-    end
-  end)
+  get_window().show_bookmarks(config)
 end
 
 -- === COMMAND HANDLERS ===
@@ -911,44 +184,44 @@ function M.handle_stoic_bookmarks_command()
   M.show_bookmarks()
 end
 
--- Legacy handlers for backward compatibility
-function M._handle_stoic_command()
-  return M.handle_stoic_command()
-end
-
-function M._handle_stoic_today_command()
-  return M.handle_stoic_today_command()
-end
-
-function M._handle_stoic_date_command(opts)
-  return M.handle_stoic_date_command(opts)
-end
-
-function M._handle_stoic_next_command()
-  return M.handle_stoic_next_command()
-end
-
-function M._handle_stoic_prev_command()
-  return M.handle_stoic_prev_command()
-end
-
-function M._handle_stoic_bookmark_command()
-  return M.handle_stoic_bookmark_command()
-end
-
-function M._handle_stoic_bookmarks_command()
-  return M.handle_stoic_bookmarks_command()
-end
-
 -- === STATE MANAGEMENT ===
 function M._get_state()
   return {
     config = config,
-    data_loaded = data_loaded,
-    bookmarks_loaded = bookmarks_loaded,
-    current_entry = current_entry,
-    is_setup = data_loaded ~= nil
+    setup_complete = setup_complete,
+    data_loaded = get_data().is_data_loaded(),
+    bookmarks_loaded = get_bookmarks().is_bookmarks_loaded(),
+    window_open = get_window().is_window_open()
   }
+end
+
+-- === UTILITY FUNCTIONS ===
+function M.clear_cache()
+  local format_module = get_format()
+  local bookmarks_module = get_bookmarks()
+
+  format_module.clear_cache()
+  bookmarks_module.clear_cache()
+  get_navigation().clear_today_cache()
+end
+
+function M.reload_data()
+  return get_data().reload_data()
+end
+
+function M.reload_bookmarks()
+  return get_bookmarks().reload_bookmarks()
+end
+
+-- Force reset setup (useful for testing)
+function M._reset_setup()
+  setup_complete = false
+  config = {}
+  data = nil
+  navigation = nil
+  window = nil
+  bookmarks = nil
+  format = nil
 end
 
 return M

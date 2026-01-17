@@ -1,47 +1,64 @@
 -- Plugin registration for stoic.nvim
--- Minimal plugin initialization - all logic in init.lua
+-- Optimized command registration with reduced startup overhead
 
--- Register user commands using centralized handlers
-vim.api.nvim_create_user_command('Stoic', function()
-  require('stoic').handle_stoic_command()
-end, { desc = 'Show today\'s stoic reading' })
+-- Centralized command registry to reduce duplication
+local commands = {
+  Stoic = {
+    handler = 'handle_stoic_command',
+    desc = "Show today's stoic reading"
+  },
+  StoicToday = {
+    handler = 'handle_stoic_today_command',
+    desc = "Show today's stoic reading"
+  },
+  StoicDate = {
+    handler = 'handle_stoic_date_command',
+    nargs = 1,
+    desc = 'Show stoic reading for specific date'
+  },
+  StoicNext = {
+    handler = 'handle_stoic_next_command',
+    desc = 'Show next stoic reading'
+  },
+  StoicPrev = {
+    handler = 'handle_stoic_prev_command',
+    desc = 'Show previous stoic reading'
+  },
+  StoicBookmark = {
+    handler = 'handle_stoic_bookmark_command',
+    desc = 'Toggle bookmark on current stoic entry'
+  },
+  StoicBookmarks = {
+    handler = 'handle_stoic_bookmarks_command',
+    desc = 'Show all bookmarked stoic entries'
+  }
+}
 
-vim.api.nvim_create_user_command('StoicToday', function()
-  require('stoic').handle_stoic_today_command()
-end, { desc = 'Show today\'s stoic reading' })
+-- Single require call for the module
+local stoic_module = nil
 
-vim.api.nvim_create_user_command('StoicDate', function(opts)
-  require('stoic').handle_stoic_date_command(opts)
-end, { 
-  nargs = 1,
-  desc = 'Show stoic reading for specific date'
-})
+local function get_stoic_module()
+  if not stoic_module then
+    stoic_module = require('stoic')
+  end
+  return stoic_module
+end
 
-vim.api.nvim_create_user_command('StoicNext', function()
-  require('stoic').handle_stoic_next_command()
-end, { desc = 'Show next stoic reading' })
+-- Create all commands in a single loop
+for command_name, config in pairs(commands) do
+  local command_opts = {
+    desc = config.desc
+  }
+  
+  if config.nargs then
+    command_opts.nargs = config.nargs
+  end
 
-vim.api.nvim_create_user_command('StoicPrev', function()
-  require('stoic').handle_stoic_prev_command()
-end, { desc = 'Show previous stoic reading' })
+  vim.api.nvim_create_user_command(command_name, function(opts)
+    local module = get_stoic_module()
+    module[config.handler](opts)
+  end, command_opts)
+end
 
-vim.api.nvim_create_user_command('StoicBookmark', function()
-  require('stoic').handle_stoic_bookmark_command()
-end, { desc = 'Toggle bookmark on current stoic entry' })
-
-vim.api.nvim_create_user_command('StoicBookmarks', function()
-  require('stoic').handle_stoic_bookmarks_command()
-end, { desc = 'Show all bookmarked stoic entries' })
-
--- Auto setup with default configuration when plugin is loaded
-vim.api.nvim_create_autocmd('VimEnter', {
-  once = true,
-  callback = function()
-    -- Only auto-setup if not already configured
-    if not vim.g.stoic_setup then
-      require('stoic').setup()
-      vim.g.stoic_setup = true
-    end
-  end,
-  desc = 'Auto-initialize stoic.nvim'
-})
+-- Removed auto-setup autocmd to reduce startup overhead
+-- Users should call require('stoic').setup() explicitly or let lazy loading handle it
