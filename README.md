@@ -1,8 +1,7 @@
 # 🌃 stoic.nvim
 
 > Daily stoic wisdom from within Neovim inspired by this [Chrome extension](https://chromewebstore.google.com/detail/the-daily-stoic/pikckaaljkbdgdbgmjglecglbaolpgaj)
-
-[stoic.nvim](https://asciinema.org/a/AgVJY1XckvShY2IX)
+> [![stoic.nvim](https://asciinema.org/a/AgVJY1XckvShY2IX.svg)](https://asciinema.org/a/AgVJY1XckvShY2IX)
 
 > [!IMPORTANT]
 >
