@@ -1,8 +1,6 @@
 # 🌃 stoic.nvim
 
-> Daily stoic wisdom from within Neovim.
-
-This plugin was inspired by this [Chrome extension](https://chromewebstore.google.com/detail/the-daily-stoic/pikckaaljkbdgdbgmjglecglbaolpgaj)
+> Daily stoic wisdom from within Neovim inspired by this [Chrome extension](https://chromewebstore.google.com/detail/the-daily-stoic/pikckaaljkbdgdbgmjglecglbaolpgaj)
 
 ## Requirements
 
@@ -40,9 +38,9 @@ This plugin was inspired by this [Chrome extension](https://chromewebstore.googl
 }
 ```
 
-## Usage
+## Usage 🛠️
 
-### Commands
+### Commands ⌨️
 
 ```vim
 :Stoic            " Show today's stoic reading
@@ -54,7 +52,7 @@ This plugin was inspired by this [Chrome extension](https://chromewebstore.googl
 :StoicBookmarks   " Show all bookmarked entries
 ```
 
-### API
+### API 🌕
 
 ```lua
 require('stoic').setup(config)
@@ -91,7 +89,12 @@ require('stoic').show_bookmarks()
 }
 ```
 
-## Data Source 📜
+## Acknowledges 📜
 
 This plugin uses stoic readings based on "The Daily Stoic" by Ryan Holiday and Stephen Hanselman, containing 366 daily meditations with quotes from ancient Stoic philosophers.
+
+> **License ⚖️**
+>
+> (c) [Dean Tarisai](https://prjctimg.me)
+> Released under the [GPL-3.0](LICENSE) License.
 
