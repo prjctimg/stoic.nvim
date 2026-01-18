@@ -123,11 +123,19 @@ local function setup_keymaps(entry_config)
 
   -- Use a single keymap setup loop to reduce function calls
   local keymap_actions = {
-    [keymaps.next or 'n'] = function() M.show_next() end,
-    [keymaps.prev or 'p'] = function() M.show_prev() end,
-    [keymaps.bookmark or 'b'] = function() M.toggle_bookmark() end,
+    [keymaps.next or 'n'] = function() 
+      vim.cmd('StoicNext') 
+    end,
+    [keymaps.prev or 'p'] = function() 
+      vim.cmd('StoicPrev') 
+    end,
+    [keymaps.bookmark or 'b'] = function() 
+      vim.cmd('StoicBookmark') 
+    end,
     [keymaps.quit or 'q'] = function() close_window() end,
-    ['B'] = function() M.show_bookmarks() end
+    ['B'] = function() 
+      vim.cmd('StoicBookmarks') 
+    end
   }
 
   for key, action in pairs(keymap_actions) do
@@ -180,6 +188,39 @@ local function show_entry_in_window(entry, entry_config)
 
     -- Set up keymaps
     setup_keymaps(entry_config)
+  end
+end
+
+-- Refresh entry display without closing window
+local function refresh_entry_display(entry, entry_config)
+  if not entry or not win or not win.buf then return end
+
+  current_entry = entry
+
+  -- Format content
+  local content, highlights = format.format_entry(entry, entry_config)
+
+  -- Suppress W10 warning by temporarily disabling readonly notification
+  local original_eventignore = vim.o.eventignore
+  local original_shortmess = vim.o.shortmess
+  vim.o.eventignore = "BufModifiedSet"
+  vim.o.shortmess = vim.o.shortmess .. "W"  -- W to suppress "written to file" messages
+
+  -- Set buffer as modifiable before writing
+  vim.api.nvim_buf_set_option(win.buf, 'modifiable', true)
+  vim.api.nvim_buf_set_option(win.buf, 'readonly', false)
+  vim.api.nvim_buf_set_lines(win.buf, 0, -1, false, content)
+  vim.api.nvim_buf_set_option(win.buf, 'modifiable', true)
+  vim.api.nvim_buf_set_option(win.buf, 'readonly', true)
+
+  -- Restore original options
+  vim.o.eventignore = original_eventignore
+  vim.o.shortmess = original_shortmess
+
+  -- Clear existing highlights and apply new ones
+  vim.api.nvim_buf_clear_namespace(win.buf, 0, 0, -1)
+  for _, hl in ipairs(highlights) do
+    vim.api.nvim_buf_add_highlight(win.buf, 0, hl.group, hl.line, hl.col_start, hl.col_end)
   end
 end
 
@@ -289,8 +330,8 @@ function M.toggle_bookmark(entry_config)
     -- Notification removed - user can see bookmark indicator in UI
   end
 
-  -- Refresh display
-  show_entry_in_window(current_entry, entry_config)
+  -- Refresh display without closing window
+  refresh_entry_display(current_entry, entry_config)
 end
 
 function M.show_bookmarks(entry_config)
