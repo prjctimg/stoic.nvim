@@ -192,7 +192,20 @@ function M.show_next(entry_config)
   if not current_entry then return end
 
   local data = require("stoic.data")
-  local next_entry = data.get_next_data(current_entry._index)
+  -- Ensure we have a valid index, fallback to current entry's index or find it
+  local current_idx = current_entry._index
+  if not current_idx then
+    -- Find the index by searching through all data
+    local all_data = data.get_all_data()
+    for i, entry in ipairs(all_data) do
+      if entry.docId == current_entry.docId then
+        current_idx = i
+        break
+      end
+    end
+  end
+  
+  local next_entry = data.get_next_data(current_idx)
   show_entry_in_window(next_entry, entry_config)
 end
 
@@ -200,7 +213,20 @@ function M.show_prev(entry_config)
   if not current_entry then return end
 
   local data = require("stoic.data")
-  local prev_entry = data.get_prev_data(current_entry._index)
+  -- Ensure we have a valid index, fallback to current entry's index or find it
+  local current_idx = current_entry._index
+  if not current_idx then
+    -- Find the index by searching through all data
+    local all_data = data.get_all_data()
+    for i, entry in ipairs(all_data) do
+      if entry.docId == current_entry.docId then
+        current_idx = i
+        break
+      end
+    end
+  end
+  
+  local prev_entry = data.get_prev_data(current_idx)
   show_entry_in_window(prev_entry, entry_config)
 end
 
@@ -245,8 +271,7 @@ function M.show_bookmarks(entry_config)
       if full_entry then
         show_entry_in_window(full_entry, entry_config)
       else
-        -- Fallback to bookmarked entry if full entry not found
-        show_entry_in_window(bookmarked[idx], entry_config)
+        handle_error("bookmark navigation", "Full entry not found for docId: " .. (bookmarked[idx].docId or "nil"))
       end
     end
   end)

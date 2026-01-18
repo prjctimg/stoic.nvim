@@ -96,7 +96,6 @@ local function load_data()
   end)
 
   data_loaded = true
-  handle_info("Loaded " .. #stoic_data .. " entries")
   return true
 end
 

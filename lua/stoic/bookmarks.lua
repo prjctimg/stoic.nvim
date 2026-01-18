@@ -43,7 +43,6 @@ local function load_bookmarks()
       if success then
         bookmarks = data or {}
         bookmarks_loaded = true
-        handle_info("Loaded " .. vim.tbl_count(bookmarks) .. " bookmarks")
         return true
       else
         handle_error("bookmarks loading", "Failed to parse bookmarks file")
