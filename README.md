@@ -1,26 +1,29 @@
-# stoic.nvim
+# 🌃 stoic.nvim
 
-A Neovim plugin that displays daily stoic readings with navigation, bookmarks, and proper text formatting.
+> Daily stoic wisdom from within Neovim.
 
-## Features
+This plugin was inspired by this [Chrome extension](https://chromewebstore.google.com/detail/the-daily-stoic/pikckaaljkbdgdbgmjglecglbaolpgaj)
 
-- **Daily Stoic Readings**: 366 stoic entries from "The Daily Stoic" with quotes and commentary
-- **Navigation**: Navigate chronologically through entries (previous/next/today/date)
-- **Bookmarks**: Save and manage your favorite stoic passages
-- **Modern UI**: Integration with snacks.nvim with fallback to native APIs
-- **Flexible Configuration**: Customizable window appearance and keymaps
-- **Text Formatting**: Proper text wrapping with literal line break handling
-- **Highlights**: Syntax highlighting for different sections (title, author, quote, commentary)
+## Requirements
 
-## Installation
+- **Neovim**: 0.7.0
+- [snacks.nvim](https://github.com/folke/snacks.nvim) (optional)
 
-Using [lazy.nvim](https://github.com/folke/lazy.nvim):
+## Features 📝
+
+- 366 stoic entries from "The Daily Stoic" with quotes and commentary
+- Navigate chronologically through entries
+- Bookmark your favorite stoic passages
+- Customizable window appearance and keymaps
+
+## Installation 🏗️
+
+[lazy.nvim](https://github.com/folke/lazy.nvim) 💤
 
 ```lua
 {
-  'yourname/stoic.nvim',
+  'prjctimg/stoic.nvim',
   opts = {
-    -- Optional configuration
     window = {
       position = "center",
       width = 80,
@@ -29,7 +32,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
     },
     keymaps = {
       next = "n",
-      prev = "p", 
+      prev = "p",
       bookmark = "b",
       quit = "q"
     }
@@ -51,16 +54,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 :StoicBookmarks   " Show all bookmarked entries
 ```
 
-### Keymaps
-
-When a stoic window is open, these default keymaps are available:
-
-- `n` - Next entry
-- `p` - Previous entry
-- `b` - Toggle bookmark
-- `q` - Quit window
-
-### Lua API
+### API
 
 ```lua
 require('stoic').setup(config)
@@ -72,7 +66,7 @@ require('stoic').toggle_bookmark()
 require('stoic').show_bookmarks()
 ```
 
-## Configuration
+## Config ⚙️
 
 ```lua
 {
@@ -97,36 +91,7 @@ require('stoic').show_bookmarks()
 }
 ```
 
-## Dependencies
-
-- **Optional**: [snacks.nvim](https://github.com/folke/snacks.nvim) for enhanced UI
-- **Neovim**: Version 0.7.0 or later
-
-## File Structure
-
-```
-lua/
-├── stoic/
-│   ├── init.lua          # Main plugin entry point
-│   ├── data.lua          # Data loading and management
-│   ├── window.lua        # Window creation and management
-│   ├── format.lua        # Text formatting and display
-│   ├── navigation.lua    # Navigation between entries
-│   └── bookmarks.lua     # Bookmark functionality
-├── stoic.lua             # Plugin loader
-plugin/
-└── stoic.lua             # Plugin registration
-stoic.json               # Stoic data (366 entries)
-```
-
-## Data Source
+## Data Source 📜
 
 This plugin uses stoic readings based on "The Daily Stoic" by Ryan Holiday and Stephen Hanselman, containing 366 daily meditations with quotes from ancient Stoic philosophers.
 
-## License
-
-MIT License
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues and enhancement requests.
