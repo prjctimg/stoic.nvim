@@ -101,6 +101,11 @@ local function load_data()
     return a._date_idx < b._date_idx
   end)
 
+  -- Update _index values after sorting to reflect actual array positions
+  for i, entry in ipairs(stoic_data) do
+    entry._index = i
+  end
+
   data_loaded = true
   return true
 end
@@ -125,9 +130,6 @@ function M.get_data_by_index(idx)
     load_data()
   end
   local entry = stoic_data[idx]
-  if entry then
-    entry._index = idx
-  end
   return entry
 end
 
