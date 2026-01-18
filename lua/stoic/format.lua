@@ -86,10 +86,12 @@ function M.format_entry(entry, entry_config)
   local window_width = (entry_config.window and entry_config.window.width) or 80
   local text_width = window_width - 4 -- Account for padding
 
-  -- Add date at the top with emoji
+  -- Add date at the top with emoji and bookmark indicator
   if entry.date then
     table.insert(content, "")
-    local date_line = "📅 " .. entry.date
+    local is_entry_bookmarked = bookmarks.is_bookmarked(entry.docId)
+    local bookmark_indicator = is_entry_bookmarked and " 🔖" or ""
+    local date_line = "📅 " .. entry.date .. bookmark_indicator
     table.insert(content, date_line)
     table.insert(highlights, {
       group = entry_config.highlights.author,
@@ -192,14 +194,7 @@ function M.format_entry(entry, entry_config)
     line_num = line_num + #commentary_lines + 2
   end
 
-  -- Add bookmark indicator only
-  local is_entry_bookmarked = bookmarks.is_bookmarked(entry.docId)
-  local bookmark_indicator = is_entry_bookmarked and "🔖 Bookmarked" or ""
-
-  if bookmark_indicator ~= "" then
-    table.insert(content, bookmark_indicator)
-    table.insert(content, "")
-  end
+  -- Bookmark indicator is now shown next to date, removed from bottom
 
   return content, highlights
 end

@@ -26,7 +26,7 @@ end
 -- Parse date string and return components
 local function parse_date(date_str)
   if not date_str then return nil end
-  local month, day = date_str:match("(%a+)%s+(%d+)")
+  local month, day = date_str:match("(%a+)%s+(%d+)[a-z]*")
   if not month or not day then return nil end
   return { month = month, day = tonumber(day) }
 end

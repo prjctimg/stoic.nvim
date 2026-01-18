@@ -102,7 +102,7 @@ function M.add_bookmark(entry)
   bookmarks_cache = {}
 
   if save_bookmarks() then
-    -- Removed notification to reduce spam - user can see bookmark indicator in UI
+    vim.notify("Stoic: Entry added to bookmarks", vim.log.levels.INFO)
     return true
   end
 
@@ -131,7 +131,7 @@ function M.remove_bookmark(docId)
   bookmarks_cache = {}
 
   if save_bookmarks() then
-    -- Removed notification to reduce spam - user can see bookmark indicator in UI
+    vim.notify("Stoic: Entry removed from bookmarks", vim.log.levels.INFO)
     return true
   end
 
