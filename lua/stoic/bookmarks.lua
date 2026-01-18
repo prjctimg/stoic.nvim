@@ -14,10 +14,6 @@ local function handle_error(operation, error_msg)
   vim.notify(msg, vim.log.levels.ERROR)
 end
 
-local function handle_info(message)
-  vim.notify("Stoic: " .. message, vim.log.levels.INFO)
-end
-
 -- Get bookmarks file path (cached)
 local function get_bookmarks_file()
   if bookmarks_file == "" then
@@ -106,7 +102,7 @@ function M.add_bookmark(entry)
   bookmarks_cache = {}
 
   if save_bookmarks() then
-    handle_info("Bookmark added")
+    -- Removed notification to reduce spam - user can see bookmark indicator in UI
     return true
   end
 
@@ -135,7 +131,7 @@ function M.remove_bookmark(docId)
   bookmarks_cache = {}
 
   if save_bookmarks() then
-    handle_info("Bookmark removed")
+    -- Removed notification to reduce spam - user can see bookmark indicator in UI
     return true
   end
 

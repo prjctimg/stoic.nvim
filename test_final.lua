@@ -12,7 +12,7 @@ stoic.setup()
 
 -- Test data loading
 local data = require("stoic.data")
-local all_entries = data.get_all()
+local all_entries = data.get_all_data()
 print("✓ Loaded", #all_entries, "stoic entries")
 
 -- Test navigation
@@ -80,12 +80,12 @@ print("  🔖 View bookmarks in help:", has_view_bookmarks)
 
 -- Test bookmark functionality
 stoic.toggle_bookmark()
-local bookmarked_entries = bookmarks.get_all()
+local bookmarked_entries = bookmarks.get_all_bookmarks()
 print("  🔖 Bookmark toggle works:", #bookmarked_entries > 0)
 
 -- Test data module docId lookup
 if #bookmarked_entries > 0 then
-  local test_entry = data.get_by_docId(bookmarked_entries[1].docId)
+  local test_entry = data.get_data_by_docId(bookmarked_entries[1].docId)
   print("  🔍 DocId lookup works:", test_entry ~= nil)
 end
 

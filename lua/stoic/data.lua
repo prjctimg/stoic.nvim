@@ -81,6 +81,12 @@ local function load_data()
     entry._date_idx = date_idx
     entry._index = i
 
+    -- Ensure required fields exist and are valid
+    if not entry.docId then
+      entry.docId = "entry_" .. i
+      handle_info("Generated docId for entry at index " .. i)
+    end
+
     if entry.date then
       data_by_date[entry.date] = entry
     end

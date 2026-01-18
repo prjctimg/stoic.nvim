@@ -189,7 +189,10 @@ function M.show_entry(entry, entry_config)
 end
 
 function M.show_next(entry_config)
-  if not current_entry then return end
+  if not current_entry then 
+    handle_error("navigation", "No current entry available for next navigation")
+    return 
+  end
 
   local data = require("stoic.data")
   -- Ensure we have a valid index, fallback to current entry's index or find it
@@ -202,15 +205,38 @@ function M.show_next(entry_config)
         current_idx = i
         break
       end
+    end
+    
+    -- If still not found, try to find by date as fallback
+    if not current_idx and current_entry.date then
+      for i, entry in ipairs(all_data) do
+        if entry.date == current_entry.date then
+          current_idx = i
+          break
+        end
+      end
+    end
+    
+    -- If still not found, start from first entry
+    if not current_idx then
+      handle_error("navigation", "Current entry not found in data, starting from first entry")
+      current_idx = 1
     end
   end
   
   local next_entry = data.get_next_data(current_idx)
-  show_entry_in_window(next_entry, entry_config)
+  if next_entry then
+    show_entry_in_window(next_entry, entry_config)
+  else
+    handle_error("navigation", "Failed to get next entry")
+  end
 end
 
 function M.show_prev(entry_config)
-  if not current_entry then return end
+  if not current_entry then 
+    handle_error("navigation", "No current entry available for previous navigation")
+    return 
+  end
 
   local data = require("stoic.data")
   -- Ensure we have a valid index, fallback to current entry's index or find it
@@ -224,10 +250,30 @@ function M.show_prev(entry_config)
         break
       end
     end
+    
+    -- If still not found, try to find by date as fallback
+    if not current_idx and current_entry.date then
+      for i, entry in ipairs(all_data) do
+        if entry.date == current_entry.date then
+          current_idx = i
+          break
+        end
+      end
+    end
+    
+    -- If still not found, start from last entry
+    if not current_idx then
+      handle_error("navigation", "Current entry not found in data, starting from last entry")
+      current_idx = #all_data
+    end
   end
   
   local prev_entry = data.get_prev_data(current_idx)
-  show_entry_in_window(prev_entry, entry_config)
+  if prev_entry then
+    show_entry_in_window(prev_entry, entry_config)
+  else
+    handle_error("navigation", "Failed to get previous entry")
+  end
 end
 
 function M.toggle_bookmark(entry_config)
@@ -237,10 +283,10 @@ function M.toggle_bookmark(entry_config)
 
   if entry_is_bookmarked then
     bookmarks.remove_bookmark(current_entry.docId)
-    handle_info("Bookmark removed")
+    -- Notification removed - user can see bookmark indicator in UI
   else
     bookmarks.add_bookmark(current_entry)
-    handle_info("Bookmark added")
+    -- Notification removed - user can see bookmark indicator in UI
   end
 
   -- Refresh display
@@ -260,21 +306,89 @@ function M.show_bookmarks(entry_config)
     table.insert(items, string.format("%d. %s - %s", i, entry.title, entry.date))
   end
 
-  vim.ui.select(items, {
-    prompt = "Select bookmarked entry:",
-    format_item = function(item) return item end
-  }, function(choice, idx)
-    if choice and idx then
-      -- Get the full entry using docId to ensure quote and commentary are included
-      local data = require("stoic.data")
-      local full_entry = data.get_data_by_docId(bookmarked[idx].docId)
-      if full_entry then
-        show_entry_in_window(full_entry, entry_config)
-      else
-        handle_error("bookmark navigation", "Full entry not found for docId: " .. (bookmarked[idx].docId or "nil"))
+  -- Try vim.ui.select first, fallback to simple input if not available
+  local success, result = pcall(function()
+    vim.ui.select(items, {
+      prompt = "Select bookmarked entry:",
+      format_item = function(item) return item end
+    }, function(choice, idx)
+      if choice and idx then
+        -- Get the full entry using docId to ensure quote and commentary are included
+        local data = require("stoic.data")
+        local full_entry = data.get_data_by_docId(bookmarked[idx].docId)
+        if full_entry then
+          show_entry_in_window(full_entry, entry_config)
+        else
+          handle_error("bookmark navigation", "Full entry not found for docId: " .. (bookmarked[idx].docId or "nil"))
+        end
       end
-    end
+    end)
   end)
+  
+  -- If vim.ui.select fails, use a simple input-based fallback
+  if not success then
+    -- Show list of bookmarks and ask for number input
+    local bookmark_list = "Bookmarks:\n"
+    for i, entry in ipairs(bookmarked) do
+      bookmark_list = bookmark_list .. string.format("%d. %s - %s\n", i, entry.title, entry.date)
+    end
+    
+    -- Create a simple buffer to show bookmarks
+    local fallback_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(fallback_buf, 0, -1, false, vim.split(bookmark_list, "\n"))
+    vim.api.nvim_buf_set_option(fallback_buf, 'modifiable', false)
+    vim.api.nvim_buf_set_option(fallback_buf, 'readonly', true)
+    
+    -- Create a simple window
+    local win_config = {
+      title = "Bookmarks (enter number to jump, q to quit)",
+      style = "minimal",
+      relative = "editor",
+      border = "rounded",
+      width = 80,
+      height = math.min(#bookmarked + 5, 20),
+      row = math.floor((vim.api.nvim_list_uis()[1].height - math.min(#bookmarked + 5, 20)) / 2),
+      col = math.floor((vim.api.nvim_list_uis()[1].width - 80) / 2)
+    }
+    
+    local fallback_win = vim.api.nvim_open_win(fallback_buf, true, win_config)
+    
+    -- Set up keymaps for the fallback window
+    vim.keymap.set('n', 'q', function()
+      if vim.api.nvim_win_is_valid(fallback_win) then
+        vim.api.nvim_win_close(fallback_win, true)
+      end
+      if vim.api.nvim_buf_is_valid(fallback_buf) then
+        vim.api.nvim_buf_delete(fallback_buf, { force = true })
+      end
+    end, { buffer = fallback_buf, silent = true })
+    
+    -- Allow number selection
+    vim.keymap.set('n', '<CR>', function()
+      local line = vim.api.nvim_get_current_line()
+      local num = line:match("^(%d+)")
+      if num then
+        local idx = tonumber(num)
+        if idx >= 1 and idx <= #bookmarked then
+          local data = require("stoic.data")
+          local full_entry = data.get_data_by_docId(bookmarked[idx].docId)
+          if full_entry then
+            show_entry_in_window(full_entry, entry_config)
+          else
+            handle_error("bookmark navigation", "Full entry not found for docId: " .. (bookmarked[idx].docId or "nil"))
+          end
+        end
+      end
+      
+      -- Close the fallback window
+      if vim.api.nvim_win_is_valid(fallback_win) then
+        vim.api.nvim_win_close(fallback_win, true)
+      end
+      if vim.api.nvim_buf_is_valid(fallback_buf) then
+        vim.api.nvim_buf_delete(fallback_buf, { force = true })
+      end
+    end, { buffer = fallback_buf, silent = true })
+  end
 end
 
 function M.close_window()
