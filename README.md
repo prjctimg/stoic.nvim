@@ -2,6 +2,12 @@
 
 > Daily stoic wisdom from within Neovim inspired by this [Chrome extension](https://chromewebstore.google.com/detail/the-daily-stoic/pikckaaljkbdgdbgmjglecglbaolpgaj)
 
+![stoic.nvim](https://asciinema.org/a/AgVJY1XckvShY2IX)
+
+> [!IMPORTANT]
+>
+> This plugin uses stoic readings based on "The Daily Stoic" by Ryan Holiday and Stephen Hanselman, containing 366 daily meditations with quotes from ancient Stoic philosophers.
+
 ## Requirements
 
 - **Neovim**: 0.7.0
@@ -89,12 +95,8 @@ require('stoic').show_bookmarks()
 }
 ```
 
-## Acknowledges 📜
-
-This plugin uses stoic readings based on "The Daily Stoic" by Ryan Holiday and Stephen Hanselman, containing 366 daily meditations with quotes from ancient Stoic philosophers.
-
 > **License ⚖️**
 >
 > (c) [Dean Tarisai](https://prjctimg.me)
+>
 > Released under the [GPL-3.0](LICENSE) License.
-
