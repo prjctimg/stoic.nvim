@@ -2,6 +2,7 @@ local M = {}
 
 -- === DEFAULT CONFIGURATION ===
 local default_config = {
+  daily_reading = false,
   window = {
     position = "center",
     width = 80,
@@ -101,6 +102,17 @@ function M.setup(opts)
   vim.api.nvim_set_hl(0, config.highlights.author, { fg = "#8888ff" })
   vim.api.nvim_set_hl(0, config.highlights.quote, { fg = "#ffff88" })
   vim.api.nvim_set_hl(0, config.highlights.commentary, { fg = "#cccccc" })
+
+  -- Set up daily reading autocmd if enabled
+  if config.daily_reading then
+    vim.api.nvim_create_autocmd("VimEnter", {
+      callback = function()
+        M.show_today()
+      end,
+      once = true,
+      desc = "Show daily stoic reading on Neovim launch"
+    })
+  end
 
   setup_complete = true
   return true

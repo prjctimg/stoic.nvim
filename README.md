@@ -28,6 +28,7 @@
 {
   'prjctimg/stoic.nvim',
   opts = {
+    daily_reading = true,
     window = {
       position = "center",
       width = 80,
@@ -74,6 +75,7 @@ require('stoic').show_bookmarks()
 
 ```lua
 {
+  daily_reading = false,  -- Show daily reading on Neovim launch
   window = {
     position = "center",  -- Window position
     width = 80,          -- Window width
