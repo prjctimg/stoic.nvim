@@ -97,6 +97,14 @@ require('stoic').show_bookmarks()
 }
 ```
 
+## Contributors
+
+<!-- CONTRIBUTORS -->
+<p align="left">
+  <a href="https://github.com/prjctimg"><img src="https://github.com/prjctimg.png?size=80" width="50" height="50" style="border-radius:50%;margin:4px;" alt="prjctimg"/></a>
+</p>
+<!-- /CONTRIBUTORS -->
+
 > **License ⚖️**
 >
 > (c) [Dean Tarisai](https://prjctimg.me)
